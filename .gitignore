@@ -1,24 +1,63 @@
-# Compiled class file
+# Gradle
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+gradle-app.setting
+.gradletasknamecache
+
+# Kotlin
+*.kotlin_module
+.kotlin/
+**/.kotlin/
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+
+# Compiled Files
 *.class
-
-# Log file
-*.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
 *.nar
 *.ear
+
+# Log Files
+*.log
+
+# Temp Files
+*.tmp
+*.temp
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# JVM Crash Logs
+hs_err_pid*
+replay_pid*
+
+# Application Specific
+junk/
 *.zip
 *.tar.gz
 *.rar
-
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
