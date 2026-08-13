@@ -4,6 +4,7 @@ import Enums.LogLevel
 import Global.serverEnv
 import KeyStore.keyStore
 import Log.arkLog
+import Structs.Api.ArkRpcRequest
 import Structs.Api.LogResponse
 import Structs.Api.Request
 import Structs.LockedAuthKey
@@ -11,13 +12,16 @@ import Structs.PortableAuthKey
 import Structs.StringPair
 import Structs.UserSettings
 import Tasks.Enums.TaskCategory
+import Tasks.TaskRunner.runFileTransferTask
 import Tasks.TaskRunner.runLockedKeyTask
+import Tasks.TaskRunner.runPortableKeyTask
 import Util.decryptString
 import Util.deserialize
 import Util.encryptString
 import Util.getClientKey
 import Util.getServerKey
 import Util.serialize
+import com.example.ArkFunctionRegistry
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -62,10 +66,10 @@ fun Application.configureApiRoutes() {
 
                         //The key has been found so we can avoid caching and creating it through the argon hash again.
                         requestBody = decryptString(requestBody, cachedKey!!) //Assuring non-null because of above if statement.
-                        val requestAsObject = deserialize<Request>(requestBody) //Attempt to transform back to a request.
+                        val arkRpcRequest = deserialize<ArkRpcRequest>(requestBody) //Attempt to transform back to an ArkRpcRequest.
 
                         //Ensure some kind of request was sent before proceeding and wasting our time.
-                        if(requestAsObject == null)
+                        if(arkRpcRequest == null)
                         {
                             val logResponse = LogResponse()
                             logResponse.message = "No request has been sent."
@@ -76,29 +80,32 @@ fun Application.configureApiRoutes() {
                         }
 
                         /**
-                         * Execute the function that's embedded in the request and await the result as json.
-                         * Then, encrypt it using the client's encryption key and return it.
+                         * Execute the function by name lookup in ArkFunctionRegistry.
+                         * ArkRpcRequest carries functionName + args instead of a closure reference.
+                         * This solves the serialization blocker: function references cannot cross the wire.
                          */
-                        if(requestAsObject.function != null)
+                        val sig = ArkFunctionRegistry.get(arkRpcRequest.functionName)
+                        if(sig == null)
                         {
-                            /**
-                             * Functions will likely need to do permissions checks. To avoid a mess of
-                             * unpleasant if statements and return values exceptions will be thrown instead to
-                             * help keep the code readable. This results in us needing to use a try catch
-                             * block here to ensure we don't crash since the exception is intended to end the function.
-                             */
-                            try{
-                                val apiResult = requestAsObject.function!!(requestAsObject.json, arkUser)
-                                val encryptedResponse = encryptString(apiResult, cachedKey)
-                                call.respond(encryptedResponse)
-                                return@post
-                            }
-                            catch (e : Exception)
-                            {
-                                println(e)
-                                call.respond(HttpStatusCode.Unauthorized)
-                                return@post
-                            }
+                            val logResponse = LogResponse()
+                            logResponse.message = "Unknown function: ${arkRpcRequest.functionName}"
+                            logResponse.error = true
+                            val returnMessage = serialize(logResponse)
+                            call.respond(returnMessage)
+                            return@post
+                        }
+
+                        try{
+                            val apiResult = sig.function(arkRpcRequest.args, arkUser)
+                            val encryptedResponse = encryptString(apiResult, cachedKey)
+                            call.respond(encryptedResponse)
+                            return@post
+                        }
+                        catch (e : Exception)
+                        {
+                            println(e)
+                            call.respond(HttpStatusCode.Unauthorized)
+                            return@post
                         }
                     }
 
@@ -220,6 +227,7 @@ fun Application.configureApiRoutes() {
 
 
 
+
 suspend fun validateAuthKey(call: ApplicationCall): Boolean {
     val authHeader = call.request.headers["Authorization"]
     if (authHeader?.startsWith("Bearer ") != true) {
@@ -237,24 +245,24 @@ suspend fun validateAuthKey(call: ApplicationCall): Boolean {
      */
     val serverKey = serverEnv.get().getAuthSettings().cachedKey
     val decryptedJson = decryptString(encryptedToken, serverKey)
-    
+
     if (decryptedJson.isEmpty()) {
         call.respond(HttpStatusCode.Unauthorized, "")
         return false
     }
-    
+
     // Try LockedAuthKey first
     val lockedKey = deserialize<LockedAuthKey>(decryptedJson)
     if (lockedKey != null && lockedKey.userId.isNotEmpty() && lockedKey.hwid.isNotEmpty()) {
         return true
     }
-    
+
     // Try PortableAuthKey
     val portableKey = deserialize<PortableAuthKey>(decryptedJson)
     if (portableKey != null && portableKey.isValid()) {
         return true
     }
-    
+
     call.respond(HttpStatusCode.Unauthorized, "")
     return false
 }
@@ -270,4 +278,18 @@ fun getAuthKeyFromBearer(call: ApplicationCall) : String
     //Get Ark auth key from the string. Can be either locked or portable.
     val encryptedToken = authHeader.substring(7)
     return encryptedToken
+}
+
+/**
+ * Registers all ArkVcs RPC functions in ArkFunctionRegistry at server startup.
+ * These functions are looked up by name when clients send ArkRpcRequest payloads.
+ * The function reference itself never crosses the serialization boundary.
+ *
+ * @see ArkFunctionRegistry
+ * @see ArkRpcRequest
+ */
+fun Application.configureFunctionRegistry() {
+    ArkFunctionRegistry.register("runPortableKeyTask",  ::runPortableKeyTask)
+    ArkFunctionRegistry.register("runLockedKeyTask",  ::runLockedKeyTask)
+    ArkFunctionRegistry.register("runFileTransferTask", ::runFileTransferTask)
 }

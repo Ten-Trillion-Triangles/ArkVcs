@@ -19,7 +19,7 @@ enum class ResponseType
     Log
 }
 
-fun <T> getResponseType(value: T) : ResponseType
+fun <T> getResponseType(value : T) : ResponseType
 {
     return when (value) {
         is Structs.Api.VoidResponse -> ResponseType.Void
@@ -34,8 +34,8 @@ fun <T> getResponseType(value: T) : ResponseType
 fun <T> makeResponseStruct(type : ResponseType) : T
 {
     return when (type) {
-        ResponseType.Void -> Structs.Api.VoidResponse {}
-        ResponseType.VoidParam -> Structs.Api.VoidParamResponse {}
+        ResponseType.Void -> Structs.Api.VoidResponse(cinit = true)
+        ResponseType.VoidParam -> Structs.Api.VoidParamResponse(cinit = true)
         ResponseType.File -> Structs.Api.FileResponse()
         ResponseType.Log -> Structs.Api.LogResponse()
         ResponseType.Json -> Structs.Api.StringResponse("")
@@ -68,7 +68,7 @@ fun <T> getResponseStruct(json: String) : Pair<T, KClass<out Any>>
     val job = deserialize<ArkJob>(json)
 
     val responses = listOf<Any?>(void, voidParam, file, repo, log, string, job)
-    
+
     for(response in responses)
     {
         if(response != null)
@@ -76,8 +76,6 @@ fun <T> getResponseStruct(json: String) : Pair<T, KClass<out Any>>
             return Pair(response as T, response::class)
         }
     }
-    
+
     throw IllegalArgumentException("Unable to deserialize JSON to any known response type")
 }
-
-

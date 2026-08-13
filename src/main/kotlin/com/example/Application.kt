@@ -35,4 +35,5 @@ fun Application.module() {
     configureSecurity()
     configureRouting()
     configureApiRoutes()
+    configureFunctionRegistry()
 }

@@ -9,21 +9,31 @@ import Structs.VirtualFileSystem
  * Response that returns a single void function with no parameters or return values.
  * This is useful for responses that warrant some specific action to be taken that
  * has values stored in a known place thusly not needing to be passed as a parameter.
+ *
+ * The old closure-based field was replaced with a string name to fix the serialization
+ * blocker: function references cannot cross the serialization boundary.
+ * Client-side dispatch uses ArkFunctionRegistry lookup by functionName.
  */
 @kotlinx.serialization.Serializable
-data class VoidResponse(var function: () -> Unit?)
+data class VoidResponse(val cinit: Boolean = true)
+{
+    var functionName = ""
+}
 
 /**
  * Response that returns a single void function with a json parameter.
  * This is useful for responses that warrant some specific action to be taken that
  * has values stored in a known place thusly not needing to be passed as a parameter.
  *
- * Also includes a json variable which can optionally be used to pass the intended param to call in the function.
+ * The old closure-based field was replaced with string names to fix the serialization
+ * blocker: function references cannot cross the serialization boundary.
+ * Client-side dispatch uses ArkFunctionRegistry lookup by functionName.
  */
 @kotlinx.serialization.Serializable
-data class VoidParamResponse(var function: (json: String) -> Unit?)
+data class VoidParamResponse(val cinit: Boolean = true)
 {
-    var json = ""
+    var functionName = ""
+    var args = ""
 }
 
 /**
@@ -39,20 +49,7 @@ data class VoidParamResponse(var function: (json: String) -> Unit?)
 @kotlinx.serialization.Serializable
 data class FileResponse(val cinit: Boolean = true)
 {
-    /**
-     * Name of the root folder where the project is stored. This is the virtual path so the client must
-     * resolve where the client files are located, and then resolve to where the folder of this name is inside of it.
-     */
     var virtualProjectRootPath = ""
-
-    /**
-     * List of virtual paths to the files that are to be downloaded. These are relative to the project root in
-     * a virtual space where the client's own file system and absolute path is not accounted for. The client
-     * must resolve the real path to the location of project files, and then resolve the relative path to the
-     * specific file.
-     *
-     * Key is the file name. And the value is the virtual path to the file relative to the project root.
-     */
     var virtualPaths = mapOf<String, String>()
 }
 
@@ -69,7 +66,6 @@ data class RepoInfoResponse(val cinit: Boolean = true)
     var projectManifest = ProjectManifest()
     var accessRights = Permissions.Write
 }
-
 
 /**
  * Response that returns logging info regarding an Ark operation to the client.
