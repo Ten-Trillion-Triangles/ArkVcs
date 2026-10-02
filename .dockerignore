@@ -1,0 +1,7 @@
+# Keep the task image clean and reproducible.
+.git
+build/
+ArkClient/build/
+.gradle/
+*.iml
+.idea/

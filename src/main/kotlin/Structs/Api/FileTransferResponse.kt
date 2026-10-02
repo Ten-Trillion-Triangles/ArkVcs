@@ -11,9 +11,3 @@ data class FileTransferResponse(
     var checksum: String = "",
     var bytesTransferred: Long = 0
 )
-
-
-data class FileTicket(val cinit: Boolean = false)
-{
-    
-}
